@@ -30,3 +30,10 @@ print(np.linalg.inv(x))
 x = np.array([[1, 0, 1],
             [0, 1, 0]])
 print(np.linalg.pinv(x))
+
+x= np.array([[1, 2],
+	[3, 4]])
+
+y = np.array([[2, 4]])
+
+print(x + y)
