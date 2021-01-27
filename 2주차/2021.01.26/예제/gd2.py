@@ -8,7 +8,7 @@ Y = np.array([[1, 2], [2, 3], [4, 5]])
 # 초기 gradient 벡터
 beta_gd = [10.1, 15.1, -6.5]
 #상수항 추가
-X_ = np.array([np.append(x, [1]) for x in X])
+X_ = np.array([np.append(x, [2]) for x in X])
 for t in range(5000):
     error = y - X_ @ beta_gd
     grad = -np.transpose(X_) @ error
