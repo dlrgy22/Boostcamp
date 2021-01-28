@@ -16,6 +16,7 @@ print(f"example_series2 values : {example_series2.values}")
 
 dict_data = {"A":1, "B":2, "C":3, "D":4,}
 indexes = ["A", "B", "C", "D", "E"]
+# 인덱스값 기준으로 생성
 example_series3 = Series(dict_data, index=indexes)
 print(example_series3)
 
