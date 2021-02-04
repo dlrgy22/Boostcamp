@@ -9,12 +9,20 @@ class Model(nn.Module):
         self.init_weight = init_weight
         self.init_bias = init_bias
 
-        self.linear_list = []
+        self.layers = []
         prev_dim = input_features
         for dim in linear:
-            self.linear_list.append(nn.Linear(prev_dim, dim))
+            self.layers.append(nn.Linear(prev_dim, dim))
+            self.layers.append(nn.ReLU(True))
             prev_dim = dim
-        self.output_layer = nn.Linear(prev_dim, output_features)
+
+        self.layers.append(nn.Linear(prev_dim, output_features))
+        self.layers.append(nn.Softmax())
+
+        self.net = nn.Sequential()
+        for l_idx, layer in enumerate(self.layers):
+            layer_name = f"{type(layer).__name__.lower()}_{l_idx:02}"
+            self.net.add_module(layer_name, layer)
         self.init_params()
 
 
@@ -43,13 +51,11 @@ class Model(nn.Module):
                 init_bias_method[self.init_bias](param)
         
     def forward(self, X):
-        for linear in self.linear_list:
-            X = F.relu(linear(X))
-        return F.softmax(self.output_layer(X))
+        return self.net(X)
         
 if __name__ == "__main__":
     M = Model()
-    x_numpy = np.random.rand(2,784)
+    x_numpy = np.random.rand(2,2352)
     x_torch = torch.from_numpy(x_numpy).float().to("cpu")
     y_torch = M.forward(x_torch) # forward path
     y_numpy = y_torch.detach().cpu().numpy() # torch tensor to numpy array

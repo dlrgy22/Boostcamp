@@ -1,5 +1,6 @@
+import argparse
+
 import numpy as np
-import os
 import torch
 from torch import nn, optim
 from torch.utils.data import Dataset
@@ -10,26 +11,56 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 from PIL import Image
 
+from config import Config
 from model_structure import Model
 
 SEED = 42
 torch.manual_seed(SEED)
 
-def get_data():
+def get_config():
+    parser = argparse.ArgumentParser(description="Multi-layer perceptron")
+    parser.add_argument("--epochs", default=10, type=int)
+    parser.add_argument("--batch_size", default=256, type=int)
+    parser.add_argument("--lr", default=0.001, type=float)
+
+    args = parser.parse_args()
+
+    config = Config(
+        EPOCHS=args.epochs,
+        BATCH_SIZE=args.batch_size,
+        LEARNING_RATE=args.lr,
+        device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu"),
+    )
+
+    return config
+
+
+def get_data(BATCH_SIZE):
     data_set = ImageFolder(root='./notMNIST_small', transform=transforms.Compose([transforms.ToTensor(), ]))
     train_set, validation_set = train_test_split(data_set, test_size=0.1, random_state=123, shuffle=True)
-    train_iter = DataLoader(train_set, batch_size=32, shuffle=True, num_workers=4)
-    validation_iter = DataLoader(validation_set, batch_size=32, shuffle=True, num_workers=4)
+    train_iter = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
+    validation_iter = DataLoader(validation_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 
     return train_iter, validation_iter
 
 
-def get_model():
-    model = Model().to("cpu")
+def get_model(LEARNING_RATE, device):
+    model = Model(linear=[128, 256]).to(device)
     loss_function = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     return model, loss_function, optimizer
+
+
+def get_model_info(model):
+    np.set_printoptions(precision=3)
+    n_param = 0
+    for p_idx,(param_name,param) in enumerate(model.named_parameters()):
+        param_numpy = param.detach().cpu().numpy()
+        n_param += len(param_numpy.reshape(-1))
+        print (f"[{p_idx}] name:[{param_name}] shape:[{param_numpy.shape}].")
+        print (f"    val:{param_numpy.reshape(-1)[:5]}")
+    print (f"Total number of parameters:[{n_param}].")
 
 
 def test_eval(model, test_iter, batch_size, device):
@@ -76,12 +107,12 @@ def train_model(model, train_iter, test_iter, epochs, batch_size, device):
     print("Training Done")
 
 
-
 if __name__ == "__main__":
-    train_iter, test_iter = get_data()
-    model, loss_function, optimizer = get_model()
-
-    train_model(model, train_iter, test_iter, 10, 32, "cpu")
+    config = get_config()
+    train_iter, test_iter = get_data(config.BATCH_SIZE)
+    model, loss_function, optimizer = get_model(config.LEARNING_RATE, config.device)
+    get_model_info(model)
+    train_model(model, train_iter, test_iter, config.EPOCHS, config.BATCH_SIZE, config.device)
 
 
 
