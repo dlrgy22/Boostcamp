@@ -13,6 +13,7 @@ from PIL import Image
 
 from config import Config
 from model_structure import Model
+from cnn_model_structure import CNNModel
 
 SEED = 42
 torch.manual_seed(SEED)
@@ -52,6 +53,14 @@ def get_model(LEARNING_RATE, device):
     return model, loss_function, optimizer
 
 
+def get_cnnmodel(LEARNING_RATE, device):
+    model = CNNModel().to(device)
+    loss_function = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+
+    return model, loss_function, optimizer
+    
+
 def get_model_info(model):
     np.set_printoptions(precision=3)
     n_param = 0
@@ -88,7 +97,11 @@ def train_model(model, train_iter, test_iter, epochs, batch_size, device):
     for epoch in range(epochs):
         loss_val_sum = 0
         for batch_img, batch_lab in tqdm(train_iter):
-            X = batch_img.view(-1, 28 * 28 * 3).to(device)
+            #nn
+            #X = batch_img.view(-1, 28 * 28 * 3).to(device)
+            
+            # cnn
+            X = batch_img.to(device)
             Y = batch_lab.to(device)
 
             y_pred = model.forward(X)
@@ -110,7 +123,8 @@ def train_model(model, train_iter, test_iter, epochs, batch_size, device):
 if __name__ == "__main__":
     config = get_config()
     train_iter, test_iter = get_data(config.BATCH_SIZE)
-    model, loss_function, optimizer = get_model(config.LEARNING_RATE, config.device)
+    #model, loss_function, optimizer = get_model(config.LEARNING_RATE, config.device)
+    model, loss_function, optimizer = get_cnnmodel(config.LEARNING_RATE, config.device)
     get_model_info(model)
     train_model(model, train_iter, test_iter, config.EPOCHS, config.BATCH_SIZE, config.device)
 
