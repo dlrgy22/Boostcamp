@@ -13,7 +13,7 @@ from PIL import Image
 
 from config import Config
 from model_structure import Model
-from ensemble import ensemble
+from cnn_model_structure import CNNModel
 
 SEED = 42
 torch.manual_seed(SEED)
@@ -36,32 +36,22 @@ def get_config():
     return config
 
 
-def get_data(BATCH_SIZE, model_num):
-    data_set = ImageFolder(root='./notMNIST_small', transform=transforms.Compose([transforms.ToTensor(),]))
-    train_val_set, test_set = train_test_split(data_set, test_size=0.2, random_state=123, shuffle=True)
-    train_iters = []
-    validation_iters = []
+def get_data(BATCH_SIZE):
+    data_set = ImageFolder(root='./notMNIST_small', transform=transforms.Compose([transforms.ToTensor(), ]))
+    train_set, validation_set = train_test_split(data_set, test_size=0.1, random_state=123, shuffle=True)
+    train_iter = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
+    validation_iter = DataLoader(validation_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 
-    for i in range(model_num):
-        train_set, validtaion_set = train_test_split(train_val_set, test_size=0.1, random_state=i, shuffle=True)
-        train_iters.append(DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=4))
-        validation_iters.append(DataLoader(validtaion_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=4))
+    return train_iter, validation_iter
 
-    test_iter = DataLoader(test_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 
-    return train_iters, validation_iters, test_iter
+def get_cnnmodel(LEARNING_RATE, device):
+    model = CNNModel(convdims=[32, 64, 128], fcdims=[128]).to(device)
+    loss_function = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-def get_model(LEARNING_RATE, device, model_num):
-    models = []
-    loss_functions = []
-    optimizers = []
-    for i in range(model_num):
-        models.append(Model(linear=[128, 256]).to(device))
-        loss_functions.append(nn.CrossEntropyLoss())
-        optimizers.append(optim.Adam(models[i].parameters(), lr=LEARNING_RATE))
-
-    return models, loss_functions, optimizers
-
+    return model, loss_function, optimizer
+    
 
 def get_model_info(model):
     np.set_printoptions(precision=3)
@@ -80,9 +70,9 @@ def test_eval(model, test_iter, batch_size, device):
         test_loss = 0
         total = 0
         correct = 0
-
+        
         for batch_img, batch_lab in test_iter:
-            X = batch_img.view(-1, 28 * 28 * 3).to(device)
+            X = batch_img.to(device)
             Y = batch_lab.to(device)
             y_pred = model(X)
             _, predicted = torch.max(y_pred, 1)
@@ -93,16 +83,18 @@ def test_eval(model, test_iter, batch_size, device):
     model.train()
 
     return val_acc
-    
 
-def train_model(model, loss_function, optimizer, train_iter, validation_iter, test_iter, epochs, batch_size, device):
+
+def train_model(model, train_iter, test_iter, epochs, batch_size, device):
     print("Start training")
     
     model.init_params()
+    model.train()
     for epoch in range(epochs):
         loss_val_sum = 0
         for batch_img, batch_lab in tqdm(train_iter):
-            X = batch_img.view(-1, 28 * 28 * 3).to(device)
+
+            X = batch_img.to(device)
             Y = batch_lab.to(device)
 
             y_pred = model.forward(X)
@@ -115,27 +107,17 @@ def train_model(model, loss_function, optimizer, train_iter, validation_iter, te
             loss_val_sum += loss
     
         loss_val_avg = loss_val_sum / len(train_iter)
-        val_acc_val = test_eval(model, validation_iter, batch_size, device)
+        test_acc_val = test_eval(model, test_iter, batch_size, device)
         train_acc_val = test_eval(model, train_iter, batch_size, device)
-        print(f"epoc:[{epoch+1}/{epochs} cost:[{loss_val_avg:.3f}] test_acc : {val_acc_val:.3f} train_Acc : {train_acc_val:.3f}")
+        print(f"epoc:[{epoch+1}/{epochs} cost:[{loss_val_avg:.3f}] test_acc : {test_acc_val:.3f} train_Acc : {train_acc_val:.3f}")
     
     print("Training Done")
-    return test_eval(model, test_iter, batch_size, device)
 
 
 if __name__ == "__main__":
     config = get_config()
-    model_num = 10
-    train_iters, validation_iters, test_iter = get_data(config.BATCH_SIZE, model_num)
-    models, loss_functions, optimizers = get_model(config.LEARNING_RATE, config.device, model_num)
-    test_acc = []
-
-    for i in range(model_num):
-        get_model_info(models[i])
-        test_acc.append(train_model(models[i], loss_functions[i], optimizers[i], train_iters[i], validation_iters[i], test_iter, config.EPOCHS, config.BATCH_SIZE, config.device))
-    
-    print(test_acc, np.mean(np.array(test_acc)))
-    print(ensemble(models,model_num, test_iter, config.BATCH_SIZE, config.device))
-    
-
-
+    print(config.device)
+    train_iter, test_iter = get_data(config.BATCH_SIZE)
+    model, loss_function, optimizer = get_cnnmodel(config.LEARNING_RATE, config.device)
+    get_model_info(model)
+    train_model(model, train_iter, test_iter, config.EPOCHS, config.BATCH_SIZE, config.device)

@@ -5,7 +5,7 @@ from torch.nn import functional as F
 
 class CNNModel(nn.Module):
     def __init__(self, input_features=[3, 28, 28], output_features=10, convdims = [32, 64], 
-                fcdims = [1024, 128], ksize=3, init_weight="he", init_bias="zero", USE_BATCHNORM=False):
+                fcdims = [128], ksize=3, init_weight="he", init_bias="zero", USE_BATCHNORM=False):
         super(CNNModel, self).__init__()
         self.input_features = input_features
         self.output_features = output_features
@@ -21,7 +21,17 @@ class CNNModel(nn.Module):
         for cdim in self.convdims:
             self.layers.append(
                 nn.Conv2d(
-                    in_channels=prev_cdim,
+                    in_channels=prev_cdim, 
+                    out_channels=prev_cdim // 3,
+                    kernel_size=1,
+                    stride=1,
+                )
+            )
+
+
+            self.layers.append(
+                nn.Conv2d(
+                    in_channels=prev_cdim // 3, 
                     out_channels=cdim,
                     kernel_size=self.ksize,
                     stride=1,
@@ -32,15 +42,17 @@ class CNNModel(nn.Module):
             if USE_BATCHNORM:
                 self.layers.append(nn.BatchNorm2d(cdim))
             self.layers.append(nn.ReLU(True))
-            self.layers.append(nn.MaxPool2d(kernel_size=(3, 3), stride=(1, 1), padding=1))
-            self.layers.append(nn.Dropout2d(p=0.3))
+            self.layers.append(nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)))
+            #self.layers.append(nn.Dropout2d(p=0.7))
             prev_cdim = cdim
 
+            check_first = False
+
         self.layers.append(nn.Flatten())
-        prev_fcdim = prev_cdim*self.input_features[1]*self.input_features[2]
+        prev_fcdim = prev_cdim*(self.input_features[1]//(2**len(self.convdims)))*(self.input_features[2]//(2**len(self.convdims)))
         for fcdim in self.fcdims:
             self.layers.append(nn.Linear(prev_fcdim, fcdim, bias=True))
-            self.layers.append(nn.ReLU(True))
+            self.layers.append(nn.ReLU(True))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
             prev_fcdim = fcdim
         self.layers.append(nn.Linear(prev_fcdim, self.output_features, bias=True))
         self.layers.append(nn.Softmax())
@@ -54,29 +66,16 @@ class CNNModel(nn.Module):
 
             
     def init_params(self):
-        init_weight_method = {
-            "he" : nn.init.kaiming_normal_,
-            "xavier" : nn.init.xavier_normal_,
-        }
-        assert(
-            self.init_weight in init_weight_method.keys()
-        ), f"Select the weight initialization method in {list(init_weight_method.keys())}"
-
-        init_bias_method = {
-            "zero": nn.init.zeros_,
-            "uniform": nn.init.uniform_
-        }
-        assert(
-            self.init_bias in init_bias_method.keys()
-        ), f"Select the bias initialization method in {list(init_bias_method.keys())}"
-
-        for param_name, param in self.named_parameters():
-            if "weight" in param_name:
-                init_weight_method[self.init_weight](param)
-
-            elif "bias" in param_name:
-                init_bias_method[self.init_bias](param)
-        
+        for m in self.modules():
+            if isinstance(m,nn.Conv2d): # init conv
+                nn.init.kaiming_normal_(m.weight)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m,nn.BatchNorm2d): # init BN
+                nn.init.constant_(m.weight,1)
+                nn.init.constant_(m.bias,0)
+            elif isinstance(m,nn.Linear): # lnit dense
+                nn.init.kaiming_normal_(m.weight)
+                nn.init.zeros_(m.bias)
     def forward(self, X):
         return self.net(X)
         
