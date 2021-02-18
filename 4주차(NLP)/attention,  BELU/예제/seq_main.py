@@ -1,6 +1,7 @@
 from tqdm import tqdm
-
 import torch
+
+from seq2seq_attention import *
 vocab_size = 100
 pad_id = 0
 sos_id = 1
@@ -15,7 +16,15 @@ def padding(data, is_src=True):
         if len(seq) < max_len:
             data[i] = seq + [pad_id]*(max_len - len(seq))
     
-    return torch.LongTensor(data), torch.LongTensor(valid_lens), torch.LongTensor(max_len)
+    return torch.LongTensor(data), torch.LongTensor(valid_lens), max_len
+
+def sorting_data(src_batch, src_batch_lens, trg_batch, trg_batch_lens):
+    src_batch_lens, sorted_idx = src_batch_lens.sort(descending=True)
+    src_batch = src_batch[sorted_idx]
+    trg_batch = trg_batch[sorted_idx]
+    trg_batch_lens = trg_batch_lens[sorted_idx]
+
+    return src_batch_lens, src_batch, trg_batch_lens, trg_batch
 
 
 if __name__ == "__main__":
@@ -48,4 +57,13 @@ if __name__ == "__main__":
     trg_data = [[sos_id]+seq+[eos_id] for seq in tqdm(trg_data)]
     src_data, src_lens, src_max_len = padding(src_data)
     trg_data, trg_lens, trg_max_len = padding(trg_data)
-    print(type(trg_data))
+    src_batch_lens, src_batch, trg_batch_lens, trg_batch  = sorting_data(src_data, src_lens, trg_data, trg_lens)
+
+    encoder = Encoder()
+    dot_attn = DotAttention()
+    decoder = Decoder(dot_attn)
+
+    seq2seq = Seq2seq(encoder, decoder)
+
+    outputs = seq2seq(src_batch, src_batch_lens, trg_batch, trg_max_len, vocab_size)    
+    print(outputs.shape)
