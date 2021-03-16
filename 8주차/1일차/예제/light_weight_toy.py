@@ -7,8 +7,6 @@ print(b == 257)
 print(b is 257)
 
 # is => 주소, == 값
-
-
 print(sys.getsizeof(0))
 print(sys.getsizeof(1))
 print(sys.getsizeof(2**30 - 1))
